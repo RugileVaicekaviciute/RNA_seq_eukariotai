@@ -6,6 +6,7 @@ raw_reads: data/raw/{sample}_{read}.fastq.gz
 genome_fa: ref/genome.fa
 annotation_gtf: ref/annotation.gtf
 transcripts_fa: ref/transcripts.fa
+hisat2_index: ref/hisat2_index/genome
 
 # --- Tool parameters
 fastp_params: "--qualified_quality_phred 20 --cut_tail --length_required 25"
