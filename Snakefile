@@ -20,6 +20,8 @@ rule all:
         expand("results/fastqc_raw/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
         expand("results/fastqc_trimmed/{sample}_trimmed_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
         expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
+        "results/featurecounts/counts.txt",
+        expand("results/kallisto/{sample}/abundance.tsv", sample=SAMPLES),
 
 
 # ---------------------------------------------------------- 2.1 preprocessing
@@ -108,3 +110,57 @@ rule hisat2_align:
         "hisat2 -p {threads} -x {params.prefix} -1 {input.r1} -2 {input.r2} 2> {log} "
         "| samtools sort -@ {threads} -o {output.bam} - "
         "&& samtools index {output.bam}"
+
+
+rule featurecounts:
+    # One run over all BAM files -> one gene x sample count table
+    input:
+        bams = expand("results/aligned/{sample}.bam", sample=SAMPLES),
+        gtf  = config["annotation_gtf"]
+    output:
+        counts  = "results/featurecounts/counts.txt",
+        summary = "results/featurecounts/counts.txt.summary"   # read by MultiQC
+    log: "logs/featurecounts.log"
+    params: strand = config["featurecounts_strand"]
+    threads: config["threads"]
+    resources: mem_mb = config["mem_large"]
+    conda: "envs/quant.yaml"
+    shell:
+        # -p --countReadPairs: count fragments (read pairs), not single reads
+        "featureCounts -p --countReadPairs -s {params.strand} -T {threads} "
+        "-a {input.gtf} -o {output.counts} {input.bams} > {log} 2>&1"
+
+
+# ------------------------------------------------ 2.3 alignment-free quantification
+rule kallisto_index:
+    # Runs only if the index is missing (kept in ref/ for reuse)
+    input:
+        config["transcripts_fa"]
+    output:
+        config["kallisto_index"]
+    log: "logs/kallisto_index.log"
+    threads: config["threads"]
+    resources:
+        mem_mb = config["mem_large"],
+        runtime = 600
+    conda: "envs/quant.yaml"
+    shell:
+        "kallisto index -t {threads} -i {output} {input} > {log} 2>&1"
+
+
+rule kallisto_quant:
+    input:
+        idx = config["kallisto_index"],
+        r1  = "results/trimmed/{sample}_trimmed_1.fastq.gz",
+        r2  = "results/trimmed/{sample}_trimmed_2.fastq.gz"
+    output:
+        "results/kallisto/{sample}/abundance.tsv",
+        "results/kallisto/{sample}/abundance.h5",
+        "results/kallisto/{sample}/run_info.json"
+    log: "logs/kallisto/{sample}.log"          # pseudoalignment summary (read by MultiQC)
+    threads: config["threads"]
+    resources: mem_mb = config["mem_large"]
+    conda: "envs/quant.yaml"
+    shell:
+        "kallisto quant -t {threads} -i {input.idx} -o results/kallisto/{wildcards.sample} "
+        "{input.r1} {input.r2} > {log} 2>&1"

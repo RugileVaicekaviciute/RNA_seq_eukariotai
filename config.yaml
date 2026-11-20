@@ -1,17 +1,29 @@
 # ---- Input data ----
+# Table of samples; first column "sample" = run ID used in file names.
 samples: samples.tsv
+# Raw paired-end reads: file name pattern ({read} = 1 or 2)
 raw_reads: data/raw/{sample}_{read}.fastq.gz
 
-# ---- Reference files (created by download_references.sh) ----
+# ---- Reference files ----
 genome_fa: ref/genome.fa
 annotation_gtf: ref/annotation.gtf
 transcripts_fa: ref/transcripts.fa
-hisat2_index: ref/hisat2_index/genome
 
-# --- Tool parameters
+# ---- Indices (built by the workflow only if missing; kept next to the
+#      references so every project using the same genome can reuse them) ----
+hisat2_index: ref/hisat2_index/genome
+kallisto_index: ref/kallisto_index/transcripts.idx
+
+# ---- Tool parameters ----
+# fastp: cut low-quality ends (Q<20) and drop reads shorter than 25 bp after trimming;
+# adapters are detected automatically for paired-end data.
 fastp_params: "--qualified_quality_phred 20 --cut_tail --length_required 25"
 
-# --- Resources
-threads: 8
-mem_small: 8000
-mem_large: 20000
+# featureCounts strandedness: 0 = unstranded, 1 = stranded, 2 = reverse stranded.
+# Check with RSeQC infer_experiment and change if needed.
+featurecounts_strand: 0
+
+# ---- Computational resources ----
+threads: 8          # for multi-threaded steps (trimming, alignment, ...)
+mem_small: 8000     # MB, for light steps (FastQC, ...)
+mem_large: 20000    # MB, for heavy steps (genome index, alignment)

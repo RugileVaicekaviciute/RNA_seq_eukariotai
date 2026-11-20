@@ -1,0 +1,8 @@
+# Gene counting (featureCounts, part of subread) and alignment-free quantification
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - subread
+  - kallisto
