@@ -1,10 +1,16 @@
 # ---- Input data ----
-# Table of samples; first column "sample" = run ID used in file names.
 samples: samples.tsv
-# Raw paired-end reads are expected as {raw_dir}/{sample}_1.fastq.gz and _2.fastq.gz
-raw_dir: data/raw
+raw_reads: data/raw/{sample}_{read}.fastq.gz
 
 # ---- Reference files (created by download_references.sh) ----
 genome_fa: ref/genome.fa
 annotation_gtf: ref/annotation.gtf
 transcripts_fa: ref/transcripts.fa
+
+# --- Tool parameters
+fastp_params: "--qualified_quality_phred 20 --cut_tail --length_required 25"
+
+# --- Resources
+threads: 8
+mem_small: 8000
+mem_large: 20000

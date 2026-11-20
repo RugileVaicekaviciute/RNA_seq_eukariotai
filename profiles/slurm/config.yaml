@@ -1,0 +1,10 @@
+# How Snakemake submits jobs on MIF HPC.  Use:  snakemake --profile profiles/slurm
+executor: slurm                        
+jobs: 10
+software-deployment-method: conda
+latency-wait: 60
+printshellcmds: true
+default-resources:
+  slurm_partition: main
+  mem_mb: 8000
+  runtime: 600                         # minutes

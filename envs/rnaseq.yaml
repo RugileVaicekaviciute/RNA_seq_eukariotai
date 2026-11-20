@@ -1,0 +1,9 @@
+# (inside .snakemake/conda/) when run with --software-deployment-method conda.
+name: hw3-rnaseq
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - fastqc
+  - fastp
