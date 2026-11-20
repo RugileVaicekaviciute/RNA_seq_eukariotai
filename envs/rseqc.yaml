@@ -1,0 +1,11 @@
+# RNA-seq alignment QC (RSeQC) + UCSC tools to turn the GTF into BED12.
+# r-base: RSeQC calls R to draw its plots.
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - rseqc
+  - ucsc-gtftogenepred
+  - ucsc-genepredtobed
+  - r-base

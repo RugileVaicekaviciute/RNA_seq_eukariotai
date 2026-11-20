@@ -1,0 +1,7 @@
+# Sample correlation and PCA
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - deeptools

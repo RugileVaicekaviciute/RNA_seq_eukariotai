@@ -22,6 +22,12 @@ rule all:
         expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
         "results/featurecounts/counts.txt",
         expand("results/kallisto/{sample}/abundance.tsv", sample=SAMPLES),
+        expand("results/rseqc/{sample}.{qc}",
+               sample=SAMPLES,
+               qc=["bam_stat.txt", "infer_experiment.txt", "read_distribution.txt",
+                   "geneBodyCoverage.txt", "inner_distance_freq.txt"]),
+        "results/deeptools/correlation_heatmap.png",
+        "results/deeptools/pca.png",
 
 
 # ---------------------------------------------------------- 2.1 preprocessing
@@ -164,3 +170,119 @@ rule kallisto_quant:
     shell:
         "kallisto quant -t {threads} -i {input.idx} -o results/kallisto/{wildcards.sample} "
         "{input.r1} {input.r2} > {log} 2>&1"
+
+
+# ------------------------------------------------ 2.3 alignment quality assessment
+rule qc_bed:
+    # GTF -> BED12 with one canonical transcript per protein-coding gene.
+    # A small, clean gene model keeps RSeQC fast (esp. gene body coverage)
+    # and avoids counting the same region many times through isoforms.
+    input:
+        config["annotation_gtf"]
+    output:
+        config["qc_bed"]
+    log: "logs/qc_bed.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/rseqc.yaml"
+    shell:
+        "(grep 'tag \"Ensembl_canonical\"' {input} | grep 'gene_type \"protein_coding\"' > {output}.tmp.gtf "
+        "&& gtfToGenePred {output}.tmp.gtf {output}.tmp.gp "
+        "&& genePredToBed {output}.tmp.gp {output} "
+        "&& rm {output}.tmp.gtf {output}.tmp.gp) > {log} 2>&1"
+
+
+rule rseqc_bam_stat:                     # a) alignment statistics
+    input: "results/aligned/{sample}.bam"
+    output: "results/rseqc/{sample}.bam_stat.txt"
+    log: "logs/rseqc/{sample}.bam_stat.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/rseqc.yaml"
+    shell: "bam_stat.py -i {input} > {output} 2> {log}"
+
+
+rule rseqc_infer_experiment:             # b) library strandedness
+    input:
+        bam = "results/aligned/{sample}.bam",
+        bed = config["qc_bed"]
+    output: "results/rseqc/{sample}.infer_experiment.txt"
+    log: "logs/rseqc/{sample}.infer_experiment.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/rseqc.yaml"
+    shell: "infer_experiment.py -i {input.bam} -r {input.bed} > {output} 2> {log}"
+
+
+rule rseqc_read_distribution:            # c) reads in CDS / UTR / introns / intergenic
+    input:
+        bam = "results/aligned/{sample}.bam",
+        bed = config["qc_bed"]
+    output: "results/rseqc/{sample}.read_distribution.txt"
+    log: "logs/rseqc/{sample}.read_distribution.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/rseqc.yaml"
+    shell: "read_distribution.py -i {input.bam} -r {input.bed} > {output} 2> {log}"
+
+
+rule rseqc_gene_body_coverage:           # d) 5'->3' coverage (RNA degradation check)
+    input:
+        bam = "results/aligned/{sample}.bam",
+        bai = "results/aligned/{sample}.bam.bai",
+        bed = config["qc_bed"]
+    output: "results/rseqc/{sample}.geneBodyCoverage.txt"
+    log: "logs/rseqc/{sample}.gene_body_coverage.log"
+    resources:
+        mem_mb = config["mem_small"],
+        runtime = 1440                   # slowest step of the workflow
+    conda: "envs/rseqc.yaml"
+    shell: "geneBody_coverage.py -i {input.bam} -r {input.bed} -o results/rseqc/{wildcards.sample} > {log} 2>&1"
+
+
+rule rseqc_inner_distance:               # e) insert size between read pairs
+    input:
+        bam = "results/aligned/{sample}.bam",
+        bed = config["qc_bed"]
+    output: "results/rseqc/{sample}.inner_distance_freq.txt"
+    log: "logs/rseqc/{sample}.inner_distance.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/rseqc.yaml"
+    shell: "inner_distance.py -i {input.bam} -r {input.bed} -o results/rseqc/{wildcards.sample} > {log} 2>&1"
+
+
+rule deeptools_summary:
+    # read counts of every sample over the same genes -> input for f) and g)
+    input:
+        bams = expand("results/aligned/{sample}.bam", sample=SAMPLES),
+        bais = expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
+        bed  = config["qc_bed"]
+    output: "results/deeptools/multibam_genes.npz"
+    log: "logs/deeptools/multibam_summary.log"
+    threads: config["threads"]
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/deeptools.yaml"
+    shell:
+        "multiBamSummary BED-file --BED {input.bed} --bamfiles {input.bams} --smartLabels "
+        "-p {threads} -o {output} > {log} 2>&1"
+
+
+rule deeptools_correlation:              # f) correlation between samples
+    input: "results/deeptools/multibam_genes.npz"
+    output:
+        png = "results/deeptools/correlation_heatmap.png",
+        tab = "results/deeptools/correlation_matrix.tab"    # read by MultiQC
+    log: "logs/deeptools/correlation.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/deeptools.yaml"
+    shell:
+        "plotCorrelation -in {input} --corMethod spearman --skipZeros --whatToPlot heatmap "
+        "--plotNumbers -o {output.png} --outFileCorMatrix {output.tab} > {log} 2>&1"
+
+
+rule deeptools_pca:                      # g) principal component analysis
+    input: "results/deeptools/multibam_genes.npz"
+    output:
+        png = "results/deeptools/pca.png",
+        tab = "results/deeptools/pca.tab"                   # read by MultiQC
+    log: "logs/deeptools/pca.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/deeptools.yaml"
+    shell:
+        "plotPCA -in {input} -o {output.png} --outFileNameData {output.tab} > {log} 2>&1"

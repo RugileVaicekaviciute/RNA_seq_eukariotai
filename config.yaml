@@ -13,6 +13,9 @@ transcripts_fa: ref/transcripts.fa
 #      references so every project using the same genome can reuse them) ----
 hisat2_index: ref/hisat2_index/genome
 kallisto_index: ref/kallisto_index/transcripts.idx
+# BED12 of one canonical transcript per protein-coding gene (made from the GTF),
+# used by RSeQC and deepTools
+qc_bed: ref/annotation.canonical_pc.bed
 
 # ---- Tool parameters ----
 # fastp: cut low-quality ends (Q<20) and drop reads shorter than 25 bp after trimming;
