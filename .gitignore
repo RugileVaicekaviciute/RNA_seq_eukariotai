@@ -1,5 +1,14 @@
+data/
+ref/
+results/
+logs/
+
+
 *.sam
 *.bam
 *.gz
-*.fasta
+*.fastq
+*.fq.gz
+*.fastq.gz
 
+slurm-*.out
