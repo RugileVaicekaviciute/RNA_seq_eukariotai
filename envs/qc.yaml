@@ -1,0 +1,8 @@
+# Read QC and trimming
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - fastqc
+  - fastp

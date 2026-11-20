@@ -1,0 +1,8 @@
+# Genome alignment and BAM handling
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - hisat2
+  - samtools
