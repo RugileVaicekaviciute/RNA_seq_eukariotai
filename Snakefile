@@ -2,27 +2,27 @@ import csv
 
 configfile: "config.yaml"
 
+# Sample names = "sample" column of the sample table (nothing is hard-coded here)
 with open(config["samples"]) as f:
     SAMPLES = [row["sample"] for row in csv.DictReader(f, delimiter="\t")]
-
-ENV = "envs/rnaseq.yaml"
 
 HISAT2_INDEX = multiext(config["hisat2_index"],
                         ".1.ht2", ".2.ht2", ".3.ht2", ".4.ht2",
                         ".5.ht2", ".6.ht2", ".7.ht2", ".8.ht2")
 
-
 wildcard_constraints:
     read = "1|2"
 
 
+# ---------------------------------------------------------------- final target
 rule all:
     input:
         expand("results/fastqc_raw/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
         expand("results/fastqc_trimmed/{sample}_trimmed_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
         expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
 
-# ----------------------------------------------------------
+
+# ---------------------------------------------------------- 2.1 preprocessing
 rule fastqc_raw:
     input:
         config["raw_reads"]
@@ -32,7 +32,7 @@ rule fastqc_raw:
     log: "logs/fastqc_raw/{sample}_{read}.log"
     threads: 2
     resources: mem_mb = config["mem_small"]
-    conda: ENV
+    conda: "envs/qc.yaml"
     shell:
         "fastqc --threads {threads} --outdir results/fastqc_raw {input} > {log} 2>&1"
 
@@ -51,7 +51,7 @@ rule trim:
     params: extra = config["fastp_params"]
     threads: config["threads"]
     resources: mem_mb = config["mem_small"]
-    conda: ENV
+    conda: "envs/qc.yaml"
     shell:
         "fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} "
         "--detect_adapter_for_pe --thread {threads} {params.extra} "
@@ -67,11 +67,12 @@ rule fastqc_trimmed:
     log: "logs/fastqc_trimmed/{sample}_{read}.log"
     threads: 2
     resources: mem_mb = config["mem_small"]
-    conda: ENV
+    conda: "envs/qc.yaml"
     shell:
         "fastqc --threads {threads} --outdir results/fastqc_trimmed {input} > {log} 2>&1"
 
-# ------------------------------------------------ 
+
+# ------------------------------------------------ 2.2 alignment-based quantification
 rule hisat2_index:
     # Runs only if the index files are missing (or older than the genome).
     input:
@@ -84,7 +85,7 @@ rule hisat2_index:
     resources:
         mem_mb = config["mem_large"],
         runtime = 600
-    conda: ENV
+    conda: "envs/align.yaml"
     shell:
         "hisat2-build -p {threads} {input} {params.prefix} > {log} 2>&1"
 
@@ -101,7 +102,7 @@ rule hisat2_align:
     params: prefix = config["hisat2_index"]
     threads: config["threads"]
     resources: mem_mb = config["mem_large"]
-    conda: ENV
+    conda: "envs/align.yaml"
     shell:
         # align -> sort by position -> index; SAM is never written to disk
         "hisat2 -p {threads} -x {params.prefix} -1 {input.r1} -2 {input.r2} 2> {log} "
