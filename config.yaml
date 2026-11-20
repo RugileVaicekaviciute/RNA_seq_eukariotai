@@ -1,0 +1,10 @@
+# ---- Input data ----
+# Table of samples; first column "sample" = run ID used in file names.
+samples: samples.tsv
+# Raw paired-end reads are expected as {raw_dir}/{sample}_1.fastq.gz and _2.fastq.gz
+raw_dir: data/raw
+
+# ---- Reference files (created by download_references.sh) ----
+genome_fa: ref/genome.fa
+annotation_gtf: ref/annotation.gtf
+transcripts_fa: ref/transcripts.fa
