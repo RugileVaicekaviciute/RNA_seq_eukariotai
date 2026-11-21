@@ -15,19 +15,25 @@ wildcard_constraints:
 
 
 # ---------------------------------------------------------------- final target
+# Every result of the workflow (also the input of the MultiQC report)
+RESULTS = [
+    expand("results/fastqc_raw/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
+    expand("results/fastqc_trimmed/{sample}_trimmed_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
+    expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
+    "results/featurecounts/counts.txt",
+    expand("results/kallisto/{sample}/abundance.tsv", sample=SAMPLES),
+    expand("results/rseqc/{sample}.{qc}",
+           sample=SAMPLES,
+           qc=["bam_stat.txt", "infer_experiment.txt", "read_distribution.txt",
+               "geneBodyCoverage.txt", "inner_distance_freq.txt"]),
+    "results/deeptools/correlation_heatmap.png",
+    "results/deeptools/pca.png",
+]
+
 rule all:
     input:
-        expand("results/fastqc_raw/{sample}_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
-        expand("results/fastqc_trimmed/{sample}_trimmed_{read}_fastqc.zip", sample=SAMPLES, read=[1, 2]),
-        expand("results/aligned/{sample}.bam.bai", sample=SAMPLES),
-        "results/featurecounts/counts.txt",
-        expand("results/kallisto/{sample}/abundance.tsv", sample=SAMPLES),
-        expand("results/rseqc/{sample}.{qc}",
-               sample=SAMPLES,
-               qc=["bam_stat.txt", "infer_experiment.txt", "read_distribution.txt",
-                   "geneBodyCoverage.txt", "inner_distance_freq.txt"]),
-        "results/deeptools/correlation_heatmap.png",
-        "results/deeptools/pca.png",
+        RESULTS,
+        "results/multiqc/multiqc_report.html"
 
 
 # ---------------------------------------------------------- 2.1 preprocessing
@@ -286,3 +292,18 @@ rule deeptools_pca:                      # g) principal component analysis
     conda: "envs/deeptools.yaml"
     shell:
         "plotPCA -in {input} -o {output.png} --outFileNameData {output.tab} > {log} 2>&1"
+
+
+# ------------------------------------------------ 2.4 reporting
+rule multiqc:
+    # Collects FastQC, fastp, HISAT2, featureCounts, kallisto, RSeQC and
+    # deepTools results and logs into one HTML report
+    input:
+        RESULTS
+    output:
+        "results/multiqc/multiqc_report.html"
+    log: "logs/multiqc.log"
+    resources: mem_mb = config["mem_small"]
+    conda: "envs/multiqc.yaml"
+    shell:
+        "multiqc --force --outdir results/multiqc results logs > {log} 2>&1"

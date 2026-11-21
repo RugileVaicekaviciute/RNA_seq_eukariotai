@@ -14,3 +14,4 @@ logs/
 slurm-*.out
 
 .snakemake/
+log.txt

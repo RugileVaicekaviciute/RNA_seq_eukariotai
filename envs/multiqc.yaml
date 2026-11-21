@@ -1,0 +1,7 @@
+# Report that aggregates QC results and logs of all steps
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - multiqc
